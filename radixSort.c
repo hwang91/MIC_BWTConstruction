@@ -24,6 +24,11 @@ int main()
       printf("%d ", R[i]);
    }
    printf("\n");
+
+    char test[4] = "2013";
+   for (i = 0; i < 4; i++)
+      printf("%d\n",test[i] - 48);
+    printf("\n");   
    
    return 0;
 }
