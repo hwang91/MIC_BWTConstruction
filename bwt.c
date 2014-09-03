@@ -1,6 +1,6 @@
 //bwt.c
 // Wang Heng
-// Sept 3, 201LEN - 1
+// Sept 3, 2014
 
 #include <stdio.h>
 
