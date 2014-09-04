@@ -1,1 +1,0 @@
-libzoo/io/libzoo_a-FastOFStream.o: libzoo/io/FastOFStream.cpp

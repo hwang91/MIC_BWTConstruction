@@ -38,22 +38,18 @@ int main(){
         for(k = 0; k < 15; k++)
             rank_before[k] = rank_after[k];
 
+        //Pre-calculated
         for(k =0; k < 5; k++)
             C[k] = 0;
-
+        //Pre-calculated
         for(k = 0; k < 15; k++)
             C[s[k][i] - '0']++;
 
-        /* Print counts 
-        for(k = 0; k < 5; k++)
-            printf("%d\t", C[k]);
-
-        putchar('\n');
-        */
-
+        //Pre-calculated
         for(k = 1; k < 5; k++)
             C[k] = C[k] + C[k-1];
         
+
         for(k = 14; k>= 0; k--){
             value = s[rank_before[k]][i] - '0';
             pos   = C[value];
