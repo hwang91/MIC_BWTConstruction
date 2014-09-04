@@ -1,0 +1,1 @@
+/Users/hwang/Documents/Github/MIC_BWTConstruction/BEETL-RELEASE_1_0_0/tests/../src/frontends/beetl-bwt -i /Users/hwang/Documents/Github/MIC_BWTConstruction/BEETL-RELEASE_1_0_0/tests/Inputs/test.fastq -o /Users/hwang/Documents/Github/MIC_BWTConstruction/BEETL-RELEASE_1_0_0/tests/fastq_ASCII_bcr_ASCII/out --output-format=ASCII --algorithm=bcr --intermediate-format=ASCII
