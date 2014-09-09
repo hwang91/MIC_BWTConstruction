@@ -9,20 +9,26 @@
 //#define PRINT_COUNT
 
 #define ALPHABETA_SIZE  4
-#define READ_LEN        4
-#define READ_NUM        3
+//#define READ_LEN        8
+//#define READ_NUM        5
 
-char s[READ_NUM][READ_LEN];
-int  Count[READ_LEN][ALPHABETA_SIZE + 1] = {0}; 
+//char s[READ_NUM][READ_LEN];
+//int  Count[READ_LEN][ALPHABETA_SIZE + 1] = {0}; 
 char ConvertBase2Int(char c); //Convert ACGT to 1234;
 
 int main(int argc, char** argv){
+
+    int READ_LEN = atoi(argv[2]);
+    int READ_NUM = atoi(argv[3]);
+
+    char* s = (char*)malloc(sizeof(char) * READ_LEN * READ_NUM);
+    int * Count = (int*)malloc(sizeof(int) * READ_LEN * (ALPHABETA_SIZE + 1));
 
     int i = 0;
     int j = 0;
     FILE *fp;
 
-    if((fp = fopen("./test.fa", "rt")) == NULL){
+    if((fp = fopen(argv[1], "rt")) == NULL){
         printf("Cannot open file strike any key exit!");
         exit(1);
     }
@@ -34,8 +40,8 @@ int main(int argc, char** argv){
             j = 0;
             c = fgetc(fp);
         }
-        s[i][j] = ConvertBase2Int(c);
-        Count[j][ConvertBase2Int(c) - '0']++;
+        s[i * READ_LEN + j] = ConvertBase2Int(c);
+        Count[j * READ_LEN + ConvertBase2Int(c) - '0']++;
         j++ ;
         c = fgetc(fp);
     }
@@ -45,30 +51,30 @@ int main(int argc, char** argv){
 
     for(i = 0; i < READ_NUM; i++){
         for(j = 0; j < READ_LEN; j++)
-            putchar(s[i][j]);
+            putchar(s[i * READ_LEN + j]);
         putchar('\n');
     }
 
     for(i = READ_LEN - 2; i >= 0; i--){
         for(j = 0; j < ALPHABETA_SIZE + 1; j++)
-            Count[i][j] += Count[i + 1][j];
+            Count[i * READ_LEN + j] += Count[(i + 1) * READ_LEN + j];
     }
 
     // Calculate # of 0 
     for(j = 0; j < READ_LEN; j++)
-        Count[j][0] = READ_LEN * READ_NUM  - Count[j][1] - Count[j][2] - Count[j][3] - Count[j][4];
+        Count[j * READ_LEN] = READ_LEN * READ_NUM  - Count[j * READ_LEN + 1] - Count[j * READ_LEN + 2] - Count[j * READ_LEN + 3] - Count[j * READ_LEN + 4];
     
     //Accumulation
     for(i = 0; i < READ_LEN; i++){
         for(j = 1; j < ALPHABETA_SIZE + 1; j++)
-            Count[i][j] += Count[i][j - 1];
+            Count[i * READ_LEN + j] += Count[i * READ_LEN + j - 1];
     }
 
 #ifdef PRINT_COUNT
 
     for(i = 0; i < READ_LEN; i++){
         for(j = 0; j < ALPHABETA_SIZE + 1; j++)
-            printf("%d\t", Count[i][j]);
+            printf("%d\t", Count[i * READ_LEN + j]);
         putchar('\n');
     }
 
@@ -90,10 +96,10 @@ int main(int argc, char** argv){
         
 
         for(k = READ_NUM * READ_LEN - 1; k >= 0; k--){
-            value = ((rank_before[k] % READ_LEN + i) >= READ_LEN )? 0 : s[rank_before[k] / READ_LEN][rank_before[k] % READ_LEN + i] - '0';
-            pos   = Count[i][value];
+            value = ((rank_before[k] % READ_LEN + i) >= READ_LEN )? 0 : s[rank_before[k] + i] - '0';
+            pos   = Count[i * READ_LEN + value];
             rank_after[pos - 1] = rank_before[k];
-            Count[i][value]--;
+            Count[i * READ_LEN + value]--;
         }
         
     #ifdef PRINT_PASS
@@ -112,7 +118,7 @@ int main(int argc, char** argv){
             putchar('0');
             continue;
         }
-        printf("%c", s[rank_after[i]/READ_LEN][rank_after[i] % READ_LEN - 1]);
+        printf("%c", s[rank_after[i] - 1]);
     }
     printf("\n");
 

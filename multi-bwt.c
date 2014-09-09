@@ -4,20 +4,22 @@
 
 #include <stdio.h>
 
-#define LEN 7
+#define LEN 5
 #define ALPHABETA_SIZE 3
 
 int main(){
 
     //ACGT$, TAGT$, GGAA$}
 
-    char S[LEN] = "abaaba$";
-    char s[LEN] = "1211210";
+    //char S1[LEN] = "ACGT$";
+    char s1[LEN] = "12340";
+    char s2[LEN] = "41340";
+    char s3[LEN] = "33110";
   
 
-    int rank_before[LEN], rank_after[LEN];
+    int rank_before[LEN * 3], rank_after[LEN * 3];
     int i;
-    for(i = 0; i < LEN; i++){
+    for(i = 0; i < LEN * 3; i++){
         rank_after[i] = i;
     }
 
@@ -28,7 +30,7 @@ int main(){
         
         // set rank_before to rank_after
         // TODO: change to verctor assignment.
-        for(k = 0; k < LEN; k++) 
+        for(k = 0; k < LEN * 3 ; k++) 
             rank_before[k] = rank_after[k];
 
         //Gnerally the ALPHABETA_SIZE is very small
@@ -38,8 +40,11 @@ int main(){
         //For multiple reads, the LEN should be changed to NUM_OF_READS
         // Try to come up with a good parallel way
         // An easy way is to seperate the reads to severeal parts and count respectively
-        for(k = 0; k < LEN; k++)
-            C[s[(k+i)%(LEN)] - '0']++;
+        for(k = 0; k < LEN; k++){
+            C[s1[(k+i)%(LEN)] - '0']++;
+            C[s2[(k+i)%(LEN)] - '0']++;
+            C[s3[(k+i)%(LEN)] - '0']++;
+        }
 
         //Gnerally the ALPHABETA_SIZE is very small
         for(k = 1; k < ALPHABETA_SIZE; k++)
@@ -48,7 +53,7 @@ int main(){
         for(k = LEN - 1; k>= 0; k--){
             value = s[(rank_before[k] + i) % LEN] - '0';
             pos   = C[value];
-            rank_after[pos - 1] = rank_before[k];
+            rank_after[pos - 1] =÷ rank_before[k];
             C[value]--;
         }
 
