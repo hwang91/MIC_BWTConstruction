@@ -2,16 +2,24 @@
 // Wang Heng
 // Sept 3, 2014
 
+//TODO
+//  1) Change filename to BWTConstruct.c
+//  2) Get Elapsed time for each module
+//  3) Move some codes out of the main fuction
+//  4) Parallel on CPU
+//  5) MIC version
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 //#define PRINT_PASS
-#define PRINT_COUNT
+//#define PRINT_COUNT
 //#define DEBUG
 
 #define ALPHABETA_SIZE  4
 #define MAX_LINE_LENGTH 256
+#define WRITE_BUFFER_SIZE   1024
 //#define READ_LEN        4
 //#define READ_NUM        3
 
@@ -41,12 +49,21 @@ int main(int argc, char** argv){
 
     int i = 0;
     int j = 0;
-    FILE *fp;
+    FILE *fp, *fp_out;
+    char OutputFileName[MAX_LINE_LENGTH];
+    strcpy(OutputFileName, argv[1]);
+    strcat(OutputFileName,".bwt");
 
     if((fp = fopen(argv[1], "rt")) == NULL){
         printf("Cannot open file strike any key exit!");
         exit(1);
     }
+
+    if((fp_out = fopen(OutputFileName, "w")) == NULL){
+        printf("Cannot open Output file strike any key exit!");
+        exit(1);
+    }
+
 
     char readLine[MAX_LINE_LENGTH];
     //fgets(readLine, MAX_LINE_LENGTH, fp);
@@ -54,6 +71,9 @@ int main(int argc, char** argv){
         if(readLine[0] == '>') continue;
         for(j = 0; j < READ_LEN; j++){
             char c = readLine[j];
+            if(c != 'A' && c != 'C' && c != 'G' && c != 'T'){
+                fprintf(stderr, "%c\t%d\t%d\n", c, i, j);
+            }
             char tmp = ConvertBase2Int(c);
             s[i * READ_LEN + j] = tmp;
             Count[j * (ALPHABETA_SIZE + 1) + (tmp - '0')]++;
@@ -144,24 +164,34 @@ int main(int argc, char** argv){
 
     }
 
+    free(Count);
+    free(rank_before); 
+
+    fprintf(stderr, "%s", "Printint BWT ... ");
     
     //Print BWT
+    char * BWT = (char*)malloc(sizeof(char) * READ_LEN * READ_NUM);
+
     for(i = 0; i < READ_LEN * READ_NUM; i++){
         if(rank_after[i] % READ_LEN == 0) {
-            putchar('0');
+            BWT[i] = '0';
             continue;
         }
-        printf("%c", s[rank_after[i] - 1]);
-        if(!(i % READ_LEN)) putchar('\n');
+        BWT[i] = s[rank_after[i] - 1];
     }
-    printf("\n");
+
+    for(i = 0; i < READ_NUM; i++){
+        fwrite(BWT + i * READ_LEN, 1, READ_LEN, fp_out);
+        fwrite("\n",1,1,fp_out);
+    }
+
+    printf("Done\n");
+    free(BWT);
     
 
-    //free(rank_before); printf("1\n");
-    //free(rank_after);printf("1\n");
+ 
+    free(rank_after);
     free(s);
-    free(Count);
-
     return 0;
 }
 char ConvertBase2Int(char c){
@@ -175,7 +205,7 @@ char ConvertBase2Int(char c){
         case 'g': tmp = '3'; break;
         case 'T': tmp = '4'; break;
         case 't': tmp = '4'; break;
-        default : tmp = '5'; 
+        default : tmp = '1'; 
     }
     return tmp;
 }
