@@ -8,6 +8,8 @@
 //  3) Move some codes out of the main fuction
 //  4) Parallel on CPU
 //  5) MIC version
+//  6) Add the last column of original sequences to the BWT
+//  7) SSE instructors
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -167,7 +169,7 @@ int main(int argc, char** argv){
     free(Count);
     free(rank_before); 
 
-    fprintf(stderr, "%s", "Printint BWT ... ");
+    fprintf(stderr, "%s", "Printing BWT ... ");
     
     //Print BWT
     char * BWT = (char*)malloc(sizeof(char) * READ_LEN * READ_NUM);
@@ -198,13 +200,14 @@ char ConvertBase2Int(char c){
     char tmp;
     switch(c){
         case 'A': tmp = '1'; break;
-        case 'a': tmp = '1'; break;
+    //    case 'a': tmp = '1'; break;
         case 'C': tmp = '2'; break;
-        case 'c': tmp = '2'; break;
+    //    case 'c': tmp = '2'; break;
         case 'G': tmp = '3'; break;
-        case 'g': tmp = '3'; break;
+    //    case 'g': tmp = '3'; break;
         case 'T': tmp = '4'; break;
-        case 't': tmp = '4'; break;
+    //    case 't': tmp = '4'; break;
+        case 'N': tmp = '1'; break;
         default : tmp = '1'; 
     }
     return tmp;
