@@ -1,7 +1,7 @@
 CC = gcc
 
 radixSort: 
-	$(CC) -o radixSort radixSort.c
+	$(CC) -o radixSort radixSort.c Timing.c
  
 .PHONY: clean
 clean:

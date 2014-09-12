@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "Timing.h"
 
 //#define PRINT_PASS
 //#define PRINT_COUNT
@@ -66,6 +67,9 @@ int main(int argc, char** argv){
         exit(1);
     }
 
+    double startTime, lastEventTime, timestamp;
+    startTime = setStartTime();
+    lastEventTime = 0;
 
     char readLine[MAX_LINE_LENGTH];
     //fgets(readLine, MAX_LINE_LENGTH, fp);
@@ -83,6 +87,11 @@ int main(int argc, char** argv){
         i++;
         //fgets(readLine, MAX_LINE_LENGTH, fp);
     }
+
+    // Timestamp'ed -----------
+    timestamp = getElapsedTime(startTime);
+    printf("(Elapsed time (Sequence Loading) : %9.4f seconds)\n\n", timestamp - lastEventTime);
+    lastEventTime = timestamp;
 
 /*
     //Print sequence code
@@ -118,6 +127,13 @@ int main(int argc, char** argv){
 #endif //PRINT_COUNT
 
 
+    // Timestamp'ed -----------
+    timestamp = getElapsedTime(startTime);
+    printf("(Elapsed time (Count calculation) : %9.4f seconds)\n\n", timestamp - lastEventTime);
+    lastEventTime = timestamp;
+
+
+
     int * rank_before = (int*)malloc(sizeof(int) * READ_NUM * READ_LEN);
     if(rank_before == NULL){
         printf("Fail to alloc memory for rank_before. Exiting ... \n");
@@ -133,6 +149,12 @@ int main(int argc, char** argv){
     for(i = 0; i < READ_LEN * READ_NUM; i++){
         rank_after[i] = i;
     }
+
+    // Timestamp'ed -----------
+    timestamp = getElapsedTime(startTime);
+    printf("(Elapsed time (Rank arrays Allocation) : %9.4f seconds)\n\n", timestamp - lastEventTime);
+    lastEventTime = timestamp;
+
 
     //LSD Radix Sort
     for(i = READ_LEN - 1; i >= 0; i--){
@@ -166,10 +188,14 @@ int main(int argc, char** argv){
 
     }
 
+    // Timestamp'ed -----------
+    timestamp = getElapsedTime(startTime);
+    printf("(Elapsed time (Radix Sort) : %9.4f seconds)\n\n", timestamp - lastEventTime);
+    lastEventTime = timestamp;
+
+
     free(Count);
     free(rank_before); 
-
-    fprintf(stderr, "%s", "Printing BWT ... ");
     
     //Print BWT
     char * BWT = (char*)malloc(sizeof(char) * READ_LEN * READ_NUM);
@@ -187,9 +213,12 @@ int main(int argc, char** argv){
         fwrite("\n",1,1,fp_out);
     }
 
-    printf("Done\n");
     free(BWT);
     
+    // Timestamp'ed -----------
+    timestamp = getElapsedTime(startTime);
+    printf("(Elapsed time (Output BWT) : %9.4f seconds)\n\n", timestamp - lastEventTime);
+    lastEventTime = timestamp;
 
  
     free(rank_after);
