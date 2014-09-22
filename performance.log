@@ -1,0 +1,13 @@
+read0.6M.fa
+
+base		293.8878
+prefetch	290.2586
+
+On Yh
+
+Prefetch 64 	205.7779
+Prefetch+O3		124.0233
+Only O3			124.9747
+
+read1.2M.fa
+				336.8858

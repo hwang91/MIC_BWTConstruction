@@ -4,7 +4,7 @@
 
 //TODO
 //  1) Change filename to BWTConstruct.c
-//  2) Get Elapsed time for each module
+//  2) Get Elapsed time for each module (DONE)
 //  3) Move some codes out of the main fuction
 //  4) Parallel on CPU
 //  5) MIC version
@@ -166,15 +166,17 @@ int main(int argc, char** argv){
             rank_before[k] = rank_after[k];
 
         //Counting Sort
+        #pragma noprefetch s
+        #pragma noprefetch rank_after
+        #pragma prefetch   rank_before:1:64
         for(k = READ_NUM * READ_LEN - 1; k >= 0; k--){
-            #ifdef DEBUG
-                printf("%s %d\n", "Debug", k);
-            #endif
             value = ((rank_before[k] % READ_LEN + i) >= READ_LEN )? 0 : s[rank_before[k] + i] - '0'; 
+           
             if(value > 4 || value < 0){
                 printf("Error. %d  %d  %d\n", value, i, k);
                 exit(0);
             }
+            
             pos   = Count[i * (ALPHABETA_SIZE + 1) + value]; 
             rank_after[pos - 1] = rank_before[k]; 
             Count[i * (ALPHABETA_SIZE + 1) + value]--; 
