@@ -15,13 +15,13 @@
 #define MAX_LINE_LENGTH 256
 #define ALPHABETA_SIZE  4
 #define PRESORT_LEN     4
-#define READ_LEN        8 //Should be multiple of 4
+#define READ_LEN        100 //Should be multiple of 4
 #define READ_CODE_LEN   READ_LEN/4
-#define PARTION_COUNT   50
-#define READ_NUM        2
+#define PARTION_COUNT   READ_NUM*READ_LEN/256 * 8
+#define READ_NUM        10000
 #define PARTION_NUM     pow(ALPHABETA_SIZE, PRESORT_LEN)
 
-#define SIZE        100
+#define SIZE        10000
 #define THRESHOLD   15
 
 typedef uint8_t * string;
@@ -72,7 +72,7 @@ int main(int argc, char ** argv){
     fclose(fp);
 
     ///////////////////////////////////////////////////////////////////
-    //  Print s to screen for check
+    //  Print s in hexadecimal way
     ///////////////////////////////////////////////////////////////////
     /*
     for(i = 0; i < READ_NUM * READ_LEN/4; i++){
@@ -114,6 +114,9 @@ int main(int argc, char ** argv){
                     }
                     
                     S_Prefix_index++;
+                    if(S_Prefix_index > PARTION_COUNT){
+                        fprintf(stderr, "[ERROR] Number of %4d-suffixes overflows\n", prefix);
+                    }
                 }
 
             }
@@ -126,6 +129,9 @@ int main(int argc, char ** argv){
                         GetFragment(S_Prefix + (READ_CODE_LEN)*S_Prefix_index, s + j * READ_CODE_LEN, readPos);
                         S_Prefix[READ_CODE_LEN*S_Prefix_index] = (readPos == 0 ? 4 : s[j * READ_CODE_LEN + readPos/4 - 1] & 0x03);
                         S_Prefix_index++;
+                        if(S_Prefix_index > PARTION_COUNT){
+                            fprintf(stderr, "[ERROR] Number of %4d-suffixes overflows\n", prefix);
+                        }
                     }
                 } 
             } else {
@@ -142,11 +148,15 @@ int main(int argc, char ** argv){
                         }
                         
                         S_Prefix_index++;
+                        if(S_Prefix_index > PARTION_COUNT){
+                            fprintf(stderr, "[ERROR] Number of %4d-suffixes overflows\n", prefix);
+                        }                        
                     }
                 }
             }  
         }
 
+        fprintf(stderr,"%d\t%d\n", prefix, S_Prefix_index);
         ///////////////////////////////////////////////////////////////////
         //  Print all suffixes, in order of 0000 to 3333
         ///////////////////////////////////////////////////////////////////
@@ -172,7 +182,7 @@ int main(int argc, char ** argv){
             printf("\n");
         }
         */
-        
+
         ///////////////////////////////////////////////////////////////////
         //  Print BWT
         ///////////////////////////////////////////////////////////////////
