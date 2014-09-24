@@ -15,7 +15,7 @@
 #define MAX_LINE_LENGTH 256
 #define ALPHABETA_SIZE  4
 #define PRESORT_LEN     4
-#define READ_LEN        100 //Should be multiple of 4
+#define READ_LEN        8 //Should be multiple of 4
 #define READ_CODE_LEN   READ_LEN/4
 #define PARTION_COUNT   50
 #define READ_NUM        2
@@ -104,15 +104,15 @@ int main(int argc, char ** argv){
             for(j = 0; j < READ_NUM; j++){
                 uint8_t value = (uint8_t)(s[j*READ_CODE_LEN + READ_CODE_LEN-1] << (readPos%4 * 2));
                 if(value == prefix){
-                    S_Prefix[READ_CODE_LEN*S_Prefix_index] = value;
-                    /*
+                    //S_Prefix[READ_CODE_LEN*S_Prefix_index] = value;
+                    
                     uint8_t sw = readPos % 4 - 1;
                     switch (sw){
                         case 0 : S_Prefix[READ_CODE_LEN*S_Prefix_index] = ((uint8_t)(s[j * READ_CODE_LEN + readPos/4] & 0xC0 )>> 6); break;
                         case 1 : S_Prefix[READ_CODE_LEN*S_Prefix_index] = ((uint8_t)(s[j * READ_CODE_LEN + readPos/4] & 0x30 )>> 4); break;
                         case 2 : S_Prefix[READ_CODE_LEN*S_Prefix_index] = ((uint8_t)(s[j * READ_CODE_LEN + readPos/4] & 0x0C )>> 2); break;
                     }
-                    */
+                    
                     S_Prefix_index++;
                 }
 
@@ -124,7 +124,7 @@ int main(int argc, char ** argv){
                 for(j = 0; j < READ_NUM; j++){
                     if(s[j * READ_CODE_LEN + readPos/4] == prefix) {
                         GetFragment(S_Prefix + (READ_CODE_LEN)*S_Prefix_index, s + j * READ_CODE_LEN, readPos);
-                        //S_Prefix[READ_CODE_LEN*S_Prefix_index] = (readPos == 0 ? 4 : s[j * READ_CODE_LEN + readPos/4 - 1] & 0x03);
+                        S_Prefix[READ_CODE_LEN*S_Prefix_index] = (readPos == 0 ? 4 : s[j * READ_CODE_LEN + readPos/4 - 1] & 0x03);
                         S_Prefix_index++;
                     }
                 } 
@@ -133,34 +133,35 @@ int main(int argc, char ** argv){
                     if((uint8_t)(s[j * READ_CODE_LEN + readPos/4] << (readPos%4 * 2)) + (uint8_t)(s[j * READ_CODE_LEN + \
                                                                         readPos/4 + 1] >> (8 - readPos%4 * 2)) == prefix){
                         GetFragment(S_Prefix + (READ_CODE_LEN)*S_Prefix_index, s + j * READ_CODE_LEN, readPos);
-                        /*
+                        
                         uint8_t sw = readPos % 4 - 1;
                         switch (sw){
                             case 0 : S_Prefix[READ_CODE_LEN*S_Prefix_index] = ((uint8_t)(s[j * READ_CODE_LEN + readPos/4] & 0xC0) >> 6); break;
                             case 1 : S_Prefix[READ_CODE_LEN*S_Prefix_index] = ((uint8_t)(s[j * READ_CODE_LEN + readPos/4] & 0x30) >> 4); break;
                             case 2 : S_Prefix[READ_CODE_LEN*S_Prefix_index] = ((uint8_t)(s[j * READ_CODE_LEN + readPos/4] & 0x0C) >> 2); break;
                         }
-                        */
+                        
                         S_Prefix_index++;
                     }
                 }
             }  
         }
 
-        //uint8_t * S_Prefix_tmp = realloc(S_Prefix, sizeof(uint8_t) * S_Prefix_index * READ_CODE_LEN);
-        //if(!S_Prefix_tmp) S_Prefix = S_Prefix_tmp;
-
+        ///////////////////////////////////////////////////////////////////
+        //  Print all suffixes, in order of 0000 to 3333
+        ///////////////////////////////////////////////////////////////////
+        /*
         for(i = 0; i < S_Prefix_index * (READ_CODE_LEN); i++){
             printf("%4X", S_Prefix[i]);
             if(i%(READ_CODE_LEN) == READ_CODE_LEN-1) putchar('\n');
         }
-        /*
+        */
         string * aa = (string*)malloc(sizeof(string)*S_Prefix_index);
         for(i = 0; i < S_Prefix_index; i++)
             aa[i] = S_Prefix + READ_CODE_LEN * i;
 
         rsort(aa, S_Prefix_index);
-        */
+        
         ///////////////////////////////////////////////////////////////////
         //  Print sorted suffixes
         ///////////////////////////////////////////////////////////////////
@@ -169,27 +170,22 @@ int main(int argc, char ** argv){
             for(j = 0; j < READ_CODE_LEN; j++)
                 printf("%4X", *(*(aa + i) + j));
             printf("\n");
-        }*/
-        /*
+        }
+        */
+        
         ///////////////////////////////////////////////////////////////////
         //  Print BWT
         ///////////////////////////////////////////////////////////////////
         for(i = 0; i < S_Prefix_index; i++){
             printf("%u", *(aa+i)[0]);
         }
-        */
+        
 
-        //free(aa);
-
-        /*
-        for(i = 0; i < S_Prefix_index * (READ_CODE_LEN); i++){
-            printf("%4X", S_Prefix[i]);
-            if(i%(READ_CODE_LEN) == READ_CODE_LEN-1) putchar('\n');
-        }
-        */
+        free(aa);
         free(S_Prefix);
 
     }
+    printf("\n");
 
     ///////////////////////////////////////////////////////////////////
     //  Free memory allocated
