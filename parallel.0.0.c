@@ -15,7 +15,7 @@
 #define MAX_LINE_LENGTH 256
 #define ALPHABETA_SIZE  4
 #define PRESORT_LEN     4
-#define READ_LEN        100
+#define READ_LEN        100 //Should be multiple of 4
 #define READ_CODE_LEN   READ_LEN/4
 #define PARTION_COUNT   50000
 #define READ_NUM        100
@@ -74,12 +74,12 @@ int main(int argc, char ** argv){
     ///////////////////////////////////////////////////////////////////
     //  Print s to screen for check
     ///////////////////////////////////////////////////////////////////
-  
+    /* 
     for(i = 0; i < READ_NUM * READ_LEN/4; i++){
         printf("%4X", s[i]);
         if(i%25 == 24) putchar('\n');
     }
-
+    */
     ///////////////////////////////////////////////////////////////////
     //  List star position of suffixes with particular 4-prefix
     ///////////////////////////////////////////////////////////////////
@@ -98,6 +98,24 @@ int main(int argc, char ** argv){
         int S_Prefix_index = 0;
 
         int readPos;
+
+        //Last 3 bases considered specially
+        for(readPos = READ_LEN -1; readPos > READ_LEN -4; readPos--){
+            for(j = 0; j < READ_NUM; j++){
+                uint8_t value = (uint8_t)(s[j*READ_LEN + READ_CODE_LEN-1] << (readPos%4 * 2));
+                if(value == prefix){
+                    S_Prefix[READ_CODE_LEN * S_Prefix_index + 1] = value;
+                    uint8_t sw = readPos % 4 - 1;
+                    switch (sw){
+                        case 0 : S_Prefix[READ_CODE_LEN*S_Prefix_index] = (uint8_t)(s[j * READ_CODE_LEN + readPos/4] & 0xC0 >> 6); break;
+                        case 1 : S_Prefix[READ_CODE_LEN*S_Prefix_index] = (uint8_t)(s[j * READ_CODE_LEN + readPos/4] & 0x30 >> 4); break;
+                        case 2 : S_Prefix[READ_CODE_LEN*S_Prefix_index] = (uint8_t)(s[j * READ_CODE_LEN + readPos/4] & 0x0C >> 2); break;
+                    }
+                    S_Prefix_index++;
+                }
+
+            }
+        }
 
         for(readPos = READ_LEN - 4; readPos >= 0; readPos--){
             if(!(readPos%4)) {
@@ -148,7 +166,6 @@ int main(int argc, char ** argv){
             if(i%(READ_CODE_LEN) == READ_CODE_LEN-1) putchar('\n');
         }
         */
-        putchar('\n');
         free(S_Prefix);
 
     }
@@ -174,18 +191,21 @@ uint8_t Convert4BaseToOneUint8(char s1, char s2, char s3, char s4){
 
 void GetFragment(uint8_t* destination, uint8_t * source, uint8_t starPosition){
     uint8_t i,j;
-    if(starPosition%4 == 0){
+    if(starPosition > READ_LEN - 4){
+        destination[0] =  (uint8_t)(source[READ_CODE_LEN-1] << (starPosition%4 * 2));
+    }
+    else if(starPosition%4 == 0){
         for(i = 0, j = starPosition/4; j < READ_CODE_LEN; i++,j++){
            destination[i] = source[j];
         }
         //strncpy(destination, source + starPosition/4, READ_CODE_LEN - starPosition/4);
-    } else {
+    } 
+    else {
         for(i = 0, j = starPosition/4; j < READ_CODE_LEN - 1; i++,j++){
             destination[i] = (uint8_t)(source[j]<<(starPosition%4 * 2)) + (uint8_t)(source[j+1] >>(8 - starPosition%4 * 2));
         }
         destination[i] = (uint8_t)(source[READ_CODE_LEN-1] << (starPosition%4 * 2));
     }
-    return;
 }
 
 void rsort(string * a, int n){ //Sort n strings
