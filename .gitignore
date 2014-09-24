@@ -4,6 +4,10 @@
 *.obj
 *.elf
 
+#log
+*.log
+*.txt
+
 # Libraries
 *.lib
 *.a
