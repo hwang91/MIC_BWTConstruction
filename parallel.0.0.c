@@ -7,7 +7,9 @@
 
 #include <stdio.h>
 #include <inttypes.h>
+#include <stdlib.h>
 #include <math.h>
+#include <string.h>
 //#include <omp.h>
 
 #define MAX_LINE_LENGTH 256
@@ -16,11 +18,11 @@
 #define READ_LEN        100
 #define READ_CODE_LEN   READ_LEN/4
 #define PARTION_COUNT   50000
-#define READ_NUM        10000
+#define READ_NUM        100
 #define PARTION_NUM     pow(ALPHABETA_SIZE, PRESORT_LEN)
 
 uint8_t Convert4BaseToOneUint8(char s1, char s2, char s3, char s4);
-void * GetFragment(uint8_t * destination, uint8_t * source, uint8_t starPosition);
+void  GetFragment(uint8_t * destination, uint8_t * source, uint8_t starPosition);
 
 int main(int argc, char ** argv){
 
@@ -60,25 +62,30 @@ int main(int argc, char ** argv){
     ///////////////////////////////////////////////////////////////////
     //  Print s to screen for check
     ///////////////////////////////////////////////////////////////////
-/*   
+  
     for(i = 0; i < READ_NUM * READ_LEN/4; i++){
         printf("%4X", s[i]);
         if(i%25 == 24) putchar('\n');
     }
-*/
+
     ///////////////////////////////////////////////////////////////////
     //  List star position of suffixes with particular 4-prefix
     ///////////////////////////////////////////////////////////////////
-    uint8_t prefix;
+    int prefix;
     for(prefix = 0; prefix < 256; prefix++){ // For every possible 4-prefix
 
         uint8_t * S_Prefix = (uint8_t*)malloc(sizeof(uint8_t)*(READ_CODE_LEN)*PARTION_COUNT);
+        if(S_Prefix == NULL) {
+            fprintf(stderr, "%s\n", "Fail to alloc memory: S_Prefix");
+            exit(0);
+        }
+    
         memset(S_Prefix, 0, READ_CODE_LEN*PARTION_COUNT);
     
 
         int S_Prefix_index = 0;
 
-        uint8_t readPos;
+        int readPos;
 
         for(readPos = READ_LEN - 4; readPos >= 0; readPos--){
             if(!(readPos%4)) {
@@ -137,19 +144,18 @@ uint8_t Convert4BaseToOneUint8(char s1, char s2, char s3, char s4){
     return i1 * 64 + i2 * 16 + i3 * 4 + i4;
 }
 
-void * GetFragment(uint8_t* destination, uint8_t * source, uint8_t starPosition){
-    //if(starPosition != READ_LEN - 4){
-        uint8_t i,j;
-        if(starPosition%4 == 0){
-            for(i = 0, j = starPosition/4; j < READ_CODE_LEN; i++,j++){
-                destination[i] = source[j];
-            }
-            //strncpy(destination, source + starPosition/4, READ_CODE_LEN - starPosition/4);
-        } else {
-            for(i = 0, j = starPosition/4; j < READ_CODE_LEN - 1; i++,j++){
-                destination[i] = (uint8_t)(source[j]<<(starPosition%4 * 2)) + (uint8_t)(source[j+1] >>(8 - starPosition%4 * 2));
-            }
-            destination[i] = (uint8_t)(source[READ_CODE_LEN-1] << (starPosition%4 * 2));
+void GetFragment(uint8_t* destination, uint8_t * source, uint8_t starPosition){
+    uint8_t i,j;
+    if(starPosition%4 == 0){
+        for(i = 0, j = starPosition/4; j < READ_CODE_LEN; i++,j++){
+           destination[i] = source[j];
         }
-    //}
+        //strncpy(destination, source + starPosition/4, READ_CODE_LEN - starPosition/4);
+    } else {
+        for(i = 0, j = starPosition/4; j < READ_CODE_LEN - 1; i++,j++){
+            destination[i] = (uint8_t)(source[j]<<(starPosition%4 * 2)) + (uint8_t)(source[j+1] >>(8 - starPosition%4 * 2));
+        }
+        destination[i] = (uint8_t)(source[READ_CODE_LEN-1] << (starPosition%4 * 2));
+    }
+    return;
 }
