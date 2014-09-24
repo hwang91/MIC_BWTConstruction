@@ -21,6 +21,18 @@
 #define READ_NUM        100
 #define PARTION_NUM     pow(ALPHABETA_SIZE, PRESORT_LEN)
 
+#define SIZE        100
+#define THRESHOLD   15
+
+typedef uint8_t * string;
+typedef struct List{
+    string * sa;
+    int sn;
+    int si;
+} List;
+
+void rsort(string *, int);
+
 uint8_t Convert4BaseToOneUint8(char s1, char s2, char s3, char s4);
 void  GetFragment(uint8_t * destination, uint8_t * source, uint8_t starPosition);
 
@@ -116,10 +128,26 @@ int main(int argc, char ** argv){
         //uint8_t * S_Prefix_tmp = realloc(S_Prefix, sizeof(uint8_t) * S_Prefix_index * READ_CODE_LEN);
         //if(!S_Prefix_tmp) S_Prefix = S_Prefix_tmp;
 
+        string * aa = (string*)malloc(sizeof(string)*S_Prefix_index);
+        for(i = 0; i < S_Prefix_index; i++)
+            aa[i] = S_Prefix + READ_CODE_LEN * i;
+
+        rsort(aa, S_Prefix_index);
+
+        for(i = 0; i < S_Prefix_index; i++){
+            for(j = 0; j < READ_CODE_LEN; j++)
+                printf("%4X", *(*(aa + i) + j));
+            printf("\n");
+        }
+
+        free(aa);
+
+        /*
         for(i = 0; i < S_Prefix_index * (READ_CODE_LEN); i++){
             printf("%4X", S_Prefix[i]);
             if(i%(READ_CODE_LEN) == READ_CODE_LEN-1) putchar('\n');
         }
+        */
         putchar('\n');
         free(S_Prefix);
 
@@ -158,4 +186,55 @@ void GetFragment(uint8_t* destination, uint8_t * source, uint8_t starPosition){
         destination[i] = (uint8_t)(source[READ_CODE_LEN-1] << (starPosition%4 * 2));
     }
     return;
+}
+
+void rsort(string * a, int n){ //Sort n strings
+
+    List stack[SIZE], *sp = stack; 
+    string          *pile[256], *ai, *ak, *ta;
+    static int      count[256] = {0};
+    int             b = 1, c, cmin, *cp, nc = 0; // nc: number of unempty buckets
+
+#define push(a, n, i)   sp->sa = a, sp->sn = n, (sp++)->si = i
+#define pop(a, n, i)    a = (--sp)->sa, n = sp->sn, i = sp->si
+#define stackempty()    (sp <= stack)
+
+
+    ta = malloc(n*sizeof(string)); // Total size: n
+    push(a, n, 1); // sp->sa = a, sp->sn = n, sp->si = 0, sp++; 
+    while(sp > stack) {
+        pop(a, n, b); // sp--, a = sp->sa, n = sp->sn, b = sp->si;
+        //Ignore the bytes before b
+    /*
+        //When the total num is less thah THRESHOLD, sort them by means of comparison.
+        if(n < THRESHOLD) {
+            simpleSort(a, n, b);
+            continue;
+        }
+    */
+        cmin = 255; //Minimum value in the bytes
+        for(ak = a+n; --ak >= a; ) {
+            c = (*ak)[b]; //Fetch the b-th byte of ak-th string
+            if(++count[c] == 1 && c > 0) { // count[c]++; then check if c is a new value
+                if(c < cmin) cmin = c; //Record the minimum value
+                nc++; //New bucket
+            }
+        }
+
+        pile[0] = ak = a + count[0];         
+        count[0] = 0;
+        for(cp = count+cmin; nc > 0; cp++, nc--) {
+            while(*cp == 0) cp++; //find next cp s.t. cp != 0;
+            if(*cp > 1)
+                push(ak, *cp, b+1); // Sort ak by the (b+1)-th byte, with total num cp
+            pile[cp - count] = ak += *cp;
+            *cp = 0;
+        }
+
+        for(ak = ta+n, ai = a+n; ak > ta; )
+            *--ak = *--ai;
+        for(ak = ta+n; ak-- > ta; )
+            *--pile[(*ak)[b]] = *ak;
+    } 
+    free(ta);
 }
