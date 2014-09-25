@@ -14,7 +14,7 @@ typedef struct List{
 } List;
 
 void rsort(string *, int);
-void simpleSort(string *, int, int);
+void SelectionSort(string *, int, int);
 
 int main(){
 /*
@@ -63,10 +63,6 @@ int main(){
     return 0;
 }
 
-void simpleSort(string * a, int n, int b){
-    ;
-}
-
 void rsort(string * a, int n){ //Sort n strings
 
     List stack[SIZE], *sp = stack; 
@@ -84,13 +80,13 @@ void rsort(string * a, int n){ //Sort n strings
     while(sp > stack) {
         pop(a, n, b); // sp--, a = sp->sa, n = sp->sn, b = sp->si;
         //Ignore the bytes before b
-    /*
+    
         //When the total num is less thah THRESHOLD, sort them by means of comparison.
         if(n < THRESHOLD) {
-            simpleSort(a, n, b);
+            SelectionSort(a, n, b);
             continue;
         }
-    */
+    
         cmin = 255; //Minimum value in the bytes
         for(ak = a+n; --ak >= a; ) {
             c = (*ak)[b]; //Fetch the b-th byte of ak-th string
@@ -116,4 +112,23 @@ void rsort(string * a, int n){ //Sort n strings
             *--pile[(*ak)[b]] = *ak;
     } 
     free(ta);
+}
+
+void SelectionSort(string *a, int n, int b) {
+    string ak;
+    int base = b;
+    int i, j, m;
+    for (i = 0; i < n; i++) {
+        for (j = i, m = i; j < n; j++) {
+            b = base;
+            while(b < 10 && (*(a+j))[b] == (*(a+m))[b]){
+                b++;
+            }
+            if ((*(a+j))[b] < (*(a+m))[b])
+                m = j;
+        }
+        ak = a[i];
+        a[i] = a[m];
+        a[m] = ak;
+    }
 }

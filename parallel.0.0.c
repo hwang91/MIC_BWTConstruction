@@ -14,14 +14,13 @@
 
 #define MAX_LINE_LENGTH 256
 #define ALPHABETA_SIZE  4
-#define PRESORT_LEN     4
+#define PRESORT_LEN     4   //Fixed value
 #define READ_LEN        100 //Should be multiple of 4
 #define READ_CODE_LEN   READ_LEN/4
 #define PARTION_COUNT   READ_NUM*READ_LEN/256 * 8
 #define READ_NUM        10000
 #define PARTION_NUM     pow(ALPHABETA_SIZE, PRESORT_LEN)
 
-#define SIZE        10000
 #define THRESHOLD   15
 
 typedef uint8_t * string;
@@ -32,7 +31,7 @@ typedef struct List{
 } List;
 
 void rsort(string *, int);
-
+void SelectionSort(string *a, int n, int b);
 uint8_t Convert4BaseToOneUint8(char s1, char s2, char s3, char s4);
 void  GetFragment(uint8_t * destination, uint8_t * source, uint8_t starPosition);
 
@@ -98,7 +97,11 @@ int main(int argc, char ** argv){
         int S_Prefix_index = 0;
 
         int readPos;
-        
+
+        ///////////////////////////////////////////////////////////////////
+        //  List the suffixes with specific prefix
+        ///////////////////////////////////////////////////////////////////        
+        // TODO: Merge the 3 cases
         //Last 3 bases considered specially
         for(readPos = READ_LEN -1; readPos > READ_LEN -4; readPos--){
             for(j = 0; j < READ_NUM; j++){
@@ -114,8 +117,9 @@ int main(int argc, char ** argv){
                     }
                     
                     S_Prefix_index++;
-                    if(S_Prefix_index > PARTION_COUNT){
+                    if(S_Prefix_index > PARTION_COUNT){ // TODO: realloc
                         fprintf(stderr, "[ERROR] Number of %4d-suffixes overflows\n", prefix);
+                        exit(0);
                     }
                 }
 
@@ -156,7 +160,7 @@ int main(int argc, char ** argv){
             }  
         }
 
-        fprintf(stderr,"%d\t%d\n", prefix, S_Prefix_index);
+        //fprintf(stderr,"%d\t%d\n", prefix, S_Prefix_index);
         ///////////////////////////////////////////////////////////////////
         //  Print all suffixes, in order of 0000 to 3333
         ///////////////////////////////////////////////////////////////////
@@ -204,6 +208,7 @@ int main(int argc, char ** argv){
     return 0;
 }
 
+//Convert 4 bases to an uint8_t
 uint8_t Convert4BaseToOneUint8(char s1, char s2, char s3, char s4){
     uint8_t i1 = (s1 == 'A' ? 0 : (s1 == 'C' ? 1 : (s1 == 'G'? 2 : 3)));
     uint8_t i2 = (s2 == 'A' ? 0 : (s2 == 'C' ? 1 : (s2 == 'G'? 2 : 3)));
@@ -233,7 +238,7 @@ void GetFragment(uint8_t* destination, uint8_t * source, uint8_t starPosition){
 
 void rsort(string * a, int n){ //Sort n strings
 
-    List stack[SIZE], *sp = stack; 
+    List stack[READ_NUM], *sp = stack; 
     string          *pile[256], *ai, *ak, *ta;
     static int      count[256] = {0};
     int             b = 1, c, cmin, *cp, nc = 0; // nc: number of unempty buckets
@@ -248,13 +253,13 @@ void rsort(string * a, int n){ //Sort n strings
     while(sp > stack) {
         pop(a, n, b); // sp--, a = sp->sa, n = sp->sn, b = sp->si;
         //Ignore the bytes before b
-    /*
+    
         //When the total num is less thah THRESHOLD, sort them by means of comparison.
         if(n < THRESHOLD) {
-            simpleSort(a, n, b);
+            SelectionSort(a, n, b);
             continue;
         }
-    */
+    
         cmin = 255; //Minimum value in the bytes
         for(ak = a+n; --ak >= a; ) {
             c = (*ak)[b]; //Fetch the b-th byte of ak-th string
@@ -280,4 +285,23 @@ void rsort(string * a, int n){ //Sort n strings
             *--pile[(*ak)[b]] = *ak;
     } 
     free(ta);
+}
+
+void SelectionSort(string *a, int n, int b) {
+    string ak;
+    int base = b;
+    int i, j, m;
+    for (i = 0; i < n; i++) {
+        for (j = i, m = i; j < n; j++) {
+            b = base;
+            while(b < READ_CODE_LEN && (*(a+j))[b] == (*(a+m))[b]){
+                b++;
+            }
+            if ((*(a+j))[b] < (*(a+m))[b])
+                m = j;
+        }
+        ak = a[i];
+        a[i] = a[m];
+        a[m] = ak;
+    }
 }
