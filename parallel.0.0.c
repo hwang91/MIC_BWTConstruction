@@ -15,13 +15,18 @@
 #define MAX_LINE_LENGTH 256
 #define ALPHABETA_SIZE  4
 #define PRESORT_LEN     4   //Fixed value
-#define READ_LEN        100 //Should be multiple of 4
-#define READ_CODE_LEN   READ_LEN/4
-#define PARTION_COUNT   READ_NUM*READ_LEN/256 * 8
-#define READ_NUM        10000
+//#define READ_LEN        100 //Should be multiple of 4
+//#define READ_CODE_LEN   READ_LEN/4
+//#define PARTION_COUNT   READ_NUM*READ_LEN/256 * 8
+//#define READ_NUM        10000
 #define PARTION_NUM     pow(ALPHABETA_SIZE, PRESORT_LEN)
 
 #define THRESHOLD   15
+
+int READ_LEN;
+int READ_NUM;
+int READ_CODE_LEN;
+int PARTION_COUNT;
 
 typedef uint8_t * string;
 typedef struct List{
@@ -37,10 +42,12 @@ void  GetFragment(uint8_t * destination, uint8_t * source, uint8_t starPosition)
 
 int main(int argc, char ** argv){
 
-/*
-    int READ_LEN = atoi(argv[2]);
-    int READ_NUM = atoi(argv[3]);
-*/
+
+    READ_LEN = atoi(argv[2]);
+    READ_NUM = atoi(argv[3]);
+    READ_CODE_LEN = READ_LEN/4;
+    PARTION_COUNT = READ_LEN * READ_NUM / 256 * 8;
+
 
     int i = 0, j;
 
@@ -238,7 +245,8 @@ void GetFragment(uint8_t* destination, uint8_t * source, uint8_t starPosition){
 
 void rsort(string * a, int n){ //Sort n strings
 
-    List stack[READ_NUM], *sp = stack; 
+    List *stack = (List*)malloc(sizeof(List) * READ_NUM);
+    List *sp = stack; 
     string          *pile[256], *ai, *ak, *ta;
     static int      count[256] = {0};
     int             b = 1, c, cmin, *cp, nc = 0; // nc: number of unempty buckets
@@ -284,6 +292,7 @@ void rsort(string * a, int n){ //Sort n strings
         for(ak = ta+n; ak-- > ta; )
             *--pile[(*ak)[b]] = *ak;
     } 
+    free(stack);
     free(ta);
 }
 
