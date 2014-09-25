@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include "Timing.h"
 
 #define MAX_LINE_LENGTH 256
 #define ALPHABETA_SIZE  4
@@ -21,6 +22,8 @@
 #define PARTION_NUM     pow(ALPHABETA_SIZE, PRESORT_LEN)
 
 #define THRESHOLD   15
+
+double startTime, lastEventTime, timestamp, partitionTime = 0, sortTime = 0;
 
 int READ_LEN;
 int READ_NUM;
@@ -50,7 +53,7 @@ int main(int argc, char ** argv){
 
     int i = 0, j;
 
-    uint8_t * s = (uint8_t*)malloc(sizeof(uint8_t) * READ_CODE_LEN * READ_NUM); //4: to be replaced by formula of ALPHABETA_SIZE
+    uint8_t * s = (uint8_t*)malloc(sizeof(uint8_t) * READ_CODE_LEN * READ_NUM); 
     if(s == NULL){
         printf("Fail to alloc memory for sequences. Exiting ... \n");
         exit(1);
@@ -65,6 +68,17 @@ int main(int argc, char ** argv){
         exit(0);
     }
 
+    FILE *fout = fopen(argv[argc - 1], "wb");
+    if(fout == NULL) {
+        fprintf(stderr, "%s\n", "Fail to open file");
+        exit(0);
+    }
+
+
+    startTime = setStartTime();
+    lastEventTime = 0;
+
+
     char readLine[MAX_LINE_LENGTH];
     //fgets(readLine, MAX_LINE_LENGTH, fp);
     while(fgets(readLine, MAX_LINE_LENGTH, fp)){
@@ -75,6 +89,11 @@ int main(int argc, char ** argv){
         i++;
     }
     fclose(fp);
+
+    timestamp = getElapsedTime(startTime);
+    printf("(Elapsed time (Sequence Loading) : %9.4f seconds)\n\n", timestamp - lastEventTime);
+    lastEventTime = timestamp;
+
 
     ///////////////////////////////////////////////////////////////////
     //  Print s in hexadecimal way
@@ -109,6 +128,9 @@ int main(int argc, char ** argv){
         ///////////////////////////////////////////////////////////////////        
         // TODO: Merge the 3 cases
         //Last 3 bases considered specially
+
+        lastEventTime = getElapsedTime(startTime);
+
         for(readPos = READ_LEN -1; readPos > READ_LEN -4; readPos--){
             for(j = 0; j < READ_NUM; j++){
                 uint8_t value = (uint8_t)(s[j*READ_CODE_LEN + READ_CODE_LEN-1] << (readPos%4 * 2));
@@ -133,39 +155,47 @@ int main(int argc, char ** argv){
         }
         
         for(readPos = READ_LEN - 4; readPos >= 0; readPos--){
-            if(!(readPos%4)) {
+            uint8_t byteIndex = readPos/4;
+            uint8_t baseIndex = readPos%4;
+            if(!(baseIndex)) {
                 for(j = 0; j < READ_NUM; j++){
-                    if(s[j * READ_CODE_LEN + readPos/4] == prefix) {
+                    if(s[j * READ_CODE_LEN + byteIndex] == prefix) {
                         GetFragment(S_Prefix + (READ_CODE_LEN)*S_Prefix_index, s + j * READ_CODE_LEN, readPos);
-                        S_Prefix[READ_CODE_LEN*S_Prefix_index] = (readPos == 0 ? 4 : s[j * READ_CODE_LEN + readPos/4 - 1] & 0x03);
+                        S_Prefix[READ_CODE_LEN*S_Prefix_index] = (readPos == 0 ? 4 : s[j * READ_CODE_LEN + byteIndex - 1] & 0x03);
                         S_Prefix_index++;
                         if(S_Prefix_index > PARTION_COUNT){
-                            fprintf(stderr, "[ERROR] Number of %4d-suffixes overflows\n", prefix);
+                            fprintf(stderr, "[ERROR] Number of %4d-suffixes overflow\n", prefix);
                         }
                     }
                 } 
             } else {
                 for(j = 0; j < READ_NUM; j++){
-                    if((uint8_t)(s[j * READ_CODE_LEN + readPos/4] << (readPos%4 * 2)) + (uint8_t)(s[j * READ_CODE_LEN + \
-                                                                        readPos/4 + 1] >> (8 - readPos%4 * 2)) == prefix){
+                    if((uint8_t)(s[j * READ_CODE_LEN + byteIndex] << (baseIndex * 2)) + (uint8_t)(s[j * READ_CODE_LEN + \
+                                                                        byteIndex + 1] >> (8 - baseIndex * 2)) == prefix){
                         GetFragment(S_Prefix + (READ_CODE_LEN)*S_Prefix_index, s + j * READ_CODE_LEN, readPos);
                         
-                        uint8_t sw = readPos % 4 - 1;
+                        uint8_t sw = baseIndex - 1;
                         switch (sw){
-                            case 0 : S_Prefix[READ_CODE_LEN*S_Prefix_index] = ((uint8_t)(s[j * READ_CODE_LEN + readPos/4] & 0xC0) >> 6); break;
-                            case 1 : S_Prefix[READ_CODE_LEN*S_Prefix_index] = ((uint8_t)(s[j * READ_CODE_LEN + readPos/4] & 0x30) >> 4); break;
-                            case 2 : S_Prefix[READ_CODE_LEN*S_Prefix_index] = ((uint8_t)(s[j * READ_CODE_LEN + readPos/4] & 0x0C) >> 2); break;
+                            case 0 : S_Prefix[READ_CODE_LEN*S_Prefix_index] = ((uint8_t)(s[j * READ_CODE_LEN + byteIndex] & 0xC0) >> 6); break;
+                            case 1 : S_Prefix[READ_CODE_LEN*S_Prefix_index] = ((uint8_t)(s[j * READ_CODE_LEN + byteIndex] & 0x30) >> 4); break;
+                            case 2 : S_Prefix[READ_CODE_LEN*S_Prefix_index] = ((uint8_t)(s[j * READ_CODE_LEN + byteIndex] & 0x0C) >> 2); break;
                         }
                         
                         S_Prefix_index++;
                         if(S_Prefix_index > PARTION_COUNT){
-                            fprintf(stderr, "[ERROR] Number of %4d-suffixes overflows\n", prefix);
+                            fprintf(stderr, "[ERROR] Number of %4d-suffixes overflow\n", prefix);
                         }                        
                     }
                 }
             }  
         }
 
+
+        timestamp = getElapsedTime(startTime);
+
+        partitionTime += timestamp - lastEventTime;
+
+        //Print number of suffixes with particular prefix
         //fprintf(stderr,"%d\t%d\n", prefix, S_Prefix_index);
 
         ///////////////////////////////////////////////////////////////////
@@ -181,7 +211,15 @@ int main(int argc, char ** argv){
         for(i = 0; i < S_Prefix_index; i++)
             aa[i] = S_Prefix + READ_CODE_LEN * i;
 
+        
+        lastEventTime = getElapsedTime(startTime);
+
         rsort(aa, S_Prefix_index);
+
+        timestamp = getElapsedTime(startTime);
+
+        sortTime += timestamp - lastEventTime;
+       
         
         ///////////////////////////////////////////////////////////////////
         //  Print sorted suffixes
@@ -197,16 +235,19 @@ int main(int argc, char ** argv){
         ///////////////////////////////////////////////////////////////////
         //  Print BWT
         ///////////////////////////////////////////////////////////////////
+        uint8_t * bwt = (uint8_t*)malloc(sizeof(uint8_t)*S_Prefix_index);
         for(i = 0; i < S_Prefix_index; i++){
-            printf("%u", *(aa+i)[0]);
+            bwt[i] = *(aa+i)[0];
         }
         
+        fwrite(bwt,sizeof(uint8_t), S_Prefix_index, fout);
 
         free(aa);
         free(S_Prefix);
 
     }
-    printf("\n");
+    fprintf(stderr, "(Elapsed time (Suffixe Partition) : %9.4f seconds)\n\n", partitionTime);
+    fprintf(stderr, "(Elapsed time (Suffixes Sorting ) : %9.4f seconds)\n\n", sortTime);
 
     ///////////////////////////////////////////////////////////////////
     //  Free memory allocated
@@ -224,12 +265,9 @@ uint8_t Convert4BaseToOneUint8(char s1, char s2, char s3, char s4){
     return i1 * 64 + i2 * 16 + i3 * 4 + i4;
 }
 
-void GetFragment(uint8_t* destination, uint8_t * source, uint8_t starPosition){
+inline void GetFragment(uint8_t* destination, uint8_t * source, uint8_t starPosition){
     uint8_t i,j;
-    if(starPosition > READ_LEN - 4){
-        destination[0] =  (uint8_t)(source[READ_CODE_LEN-1] << (starPosition%4 * 2));
-    }
-    else if(starPosition%4 == 0){
+    if(starPosition%4 == 0){
         for(i = 0, j = starPosition/4; j < READ_CODE_LEN; i++,j++){
            destination[i] = source[j];
         }
