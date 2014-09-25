@@ -10,7 +10,6 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
-//#include <omp.h>
 
 #define MAX_LINE_LENGTH 256
 #define ALPHABETA_SIZE  4
@@ -46,7 +45,7 @@ int main(int argc, char ** argv){
     READ_LEN = atoi(argv[2]);
     READ_NUM = atoi(argv[3]);
     READ_CODE_LEN = READ_LEN/4;
-    PARTION_COUNT = READ_LEN * READ_NUM / 256 * 8;
+    PARTION_COUNT = READ_LEN * READ_NUM / 256 * 8; //READ_LEN * READ_NUM should be larger than 256
 
 
     int i = 0, j;
@@ -118,9 +117,9 @@ int main(int argc, char ** argv){
                     
                     uint8_t sw = readPos % 4 - 1;
                     switch (sw){
-                        case 0 : S_Prefix[READ_CODE_LEN*S_Prefix_index] = ((uint8_t)(s[j * READ_CODE_LEN + readPos/4] & 0xC0 )>> 6); break;
-                        case 1 : S_Prefix[READ_CODE_LEN*S_Prefix_index] = ((uint8_t)(s[j * READ_CODE_LEN + readPos/4] & 0x30 )>> 4); break;
-                        case 2 : S_Prefix[READ_CODE_LEN*S_Prefix_index] = ((uint8_t)(s[j * READ_CODE_LEN + readPos/4] & 0x0C )>> 2); break;
+                        case 0 : S_Prefix[READ_CODE_LEN*S_Prefix_index] = ((uint8_t)(s[j * READ_CODE_LEN + readPos/4] & 0xC0) >> 6); break;
+                        case 1 : S_Prefix[READ_CODE_LEN*S_Prefix_index] = ((uint8_t)(s[j * READ_CODE_LEN + readPos/4] & 0x30) >> 4); break;
+                        case 2 : S_Prefix[READ_CODE_LEN*S_Prefix_index] = ((uint8_t)(s[j * READ_CODE_LEN + readPos/4] & 0x0C) >> 2); break;
                     }
                     
                     S_Prefix_index++;
@@ -168,6 +167,7 @@ int main(int argc, char ** argv){
         }
 
         //fprintf(stderr,"%d\t%d\n", prefix, S_Prefix_index);
+
         ///////////////////////////////////////////////////////////////////
         //  Print all suffixes, in order of 0000 to 3333
         ///////////////////////////////////////////////////////////////////
