@@ -1,45 +1,36 @@
-// SetBWTParallel.c
+// setBWT.c
 // Construct BWT for a large collection of short-reads in parallel
 // Version 0.0
 // Heng Wang
 // National University of Defense Technology
 // 2014/09/21
 
-#include <stdio.h>
-#include <inttypes.h>
-#include <stdlib.h>
-#include <math.h>
-#include <string.h>
-#include "Timing.h"
+// TODO
+/*
+    1) Alloc S_Prefix dynamicly
+    2) Reduce Convert4BaseToOneUint8 arguments || DONE, 2014/09/26: 10 A.M.
+*/
 
-#define MAX_LINE_LENGTH 256
-#define ALPHABETA_SIZE  4
-#define PRESORT_LEN     4   //Fixed value
-//#define READ_LEN        100 //Should be multiple of 4
-//#define READ_CODE_LEN   READ_LEN/4
-//#define PARTION_COUNT   READ_NUM*READ_LEN/256 * 8
-//#define READ_NUM        10000
-#define PARTION_NUM     pow(ALPHABETA_SIZE, PRESORT_LEN)
+// Changes
 
-#define THRESHOLD   15
+// 2014/09/26 
+// Heng Wang
+// Change type of readsPack and S_Prefix from uint8_t * to uint8_t ** || Fail
+
+#include "setBWT.h"
 
 double startTime, lastEventTime, timestamp, partitionTime = 0, sortTime = 0;
 
 int READ_LEN;
-int READ_NUM;
+unsigned long long READ_NUM;
 int READ_CODE_LEN;
-int PARTION_COUNT;
+unsinged long long PARTION_COUNT;
 
-typedef uint8_t * string;
-typedef struct List{
-    string * sa;
-    int sn;
-    int si;
-} List;
 
-void rsort(string *, int);
-void SelectionSort(string *a, int n, int b);
-uint8_t Convert4BaseToOneUint8(char s1, char s2, char s3, char s4);
+
+void rsort(string *, unsigned long long);
+void SelectionSort(string *a, unsigned long long n, int b);
+uint8_t Convert4BaseToOneUint8(char*, int);
 void  GetFragment(uint8_t * destination, uint8_t * source, uint8_t starPosition);
 
 int main(int argc, char ** argv){
@@ -48,13 +39,13 @@ int main(int argc, char ** argv){
     READ_LEN = atoi(argv[2]);
     READ_NUM = atoi(argv[3]);
     READ_CODE_LEN = READ_LEN/4;
-    PARTION_COUNT = READ_LEN * READ_NUM / 256 * 8; //READ_LEN * READ_NUM should be larger than 256
+    PARTION_COUNT = READ_LEN * READ_NUM / 256 * 16; //READ_LEN * READ_NUM should be larger than 256
 
 
-    int i = 0, j;
+    unsigned long long i = 0, j;
 
-    uint8_t * s = (uint8_t*)malloc(sizeof(uint8_t) * READ_CODE_LEN * READ_NUM); 
-    if(s == NULL){
+    uint8_t * readsPack = (uint8_t*)malloc(sizeof(uint8_t) * READ_CODE_LEN * READ_NUM); 
+    if(readsPack == NULL){
         printf("Fail to alloc memory for sequences. Exiting ... \n");
         exit(1);
     }
@@ -68,7 +59,7 @@ int main(int argc, char ** argv){
         exit(0);
     }
 
-    FILE *fout = fopen(argv[argc - 1], "wb");
+    FILE *fout = fopen(argv[argc - 1], "w");
     if(fout == NULL) {
         fprintf(stderr, "%s\n", "Fail to open file");
         exit(0);
@@ -84,7 +75,7 @@ int main(int argc, char ** argv){
     while(fgets(readLine, MAX_LINE_LENGTH, fp)){
         if(readLine[0] == '>') continue;
         for(j = 0; j < READ_CODE_LEN; j++){
-            s[i * READ_CODE_LEN + j] = Convert4BaseToOneUint8(readLine[j*4], readLine[j*4+1], readLine[j*4+2], readLine[j*4+3]);                 
+            readsPack[i * READ_CODE_LEN + j] = Convert4BaseToOneUint8(readLine, j*4);                 
         }
         i++;
     }
@@ -108,6 +99,7 @@ int main(int argc, char ** argv){
     //  List star position of suffixes with particular 4-prefix
     ///////////////////////////////////////////////////////////////////
     int prefix;
+    //#pragma omp parallel for 
     for(prefix = 0; prefix < 256; prefix++){ // For every possible 4-prefix
 
         uint8_t * S_Prefix = (uint8_t*)malloc(sizeof(uint8_t)*(READ_CODE_LEN)*PARTION_COUNT);
@@ -119,7 +111,7 @@ int main(int argc, char ** argv){
         memset(S_Prefix, 0, READ_CODE_LEN*PARTION_COUNT);
     
 
-        int S_Prefix_index = 0;
+        unsigned long long S_Prefix_index = 0;
 
         int readPos;
 
@@ -130,22 +122,15 @@ int main(int argc, char ** argv){
         //Last 3 bases considered specially
 
         lastEventTime = getElapsedTime(startTime);
-
+        
         for(readPos = READ_LEN -1; readPos > READ_LEN -4; readPos--){
             for(j = 0; j < READ_NUM; j++){
-                uint8_t value = (uint8_t)(s[j*READ_CODE_LEN + READ_CODE_LEN-1] << (readPos%4 * 2));
+                uint8_t value = (uint8_t)(readsPack[j*READ_CODE_LEN + READ_CODE_LEN-1] << (readPos%4 * 2));
                 if(value == prefix){
                     //S_Prefix[READ_CODE_LEN*S_Prefix_index] = value;
-                    
-                    uint8_t sw = readPos % 4 - 1;
-                    switch (sw){
-                        case 0 : S_Prefix[READ_CODE_LEN*S_Prefix_index] = ((uint8_t)(s[j * READ_CODE_LEN + readPos/4] & 0xC0) >> 6); break;
-                        case 1 : S_Prefix[READ_CODE_LEN*S_Prefix_index] = ((uint8_t)(s[j * READ_CODE_LEN + readPos/4] & 0x30) >> 4); break;
-                        case 2 : S_Prefix[READ_CODE_LEN*S_Prefix_index] = ((uint8_t)(s[j * READ_CODE_LEN + readPos/4] & 0x0C) >> 2); break;
-                    }
-                    
-                    S_Prefix_index++;
-                    if(S_Prefix_index > PARTION_COUNT){ // TODO: realloc
+                    S_Prefix[READ_CODE_LEN*S_Prefix_index] = ((uint8_t)readsPack[j * READ_CODE_LEN + READ_CODE_LEN-1] >> (8 - readPos%4 * 2)) & 0X03 ;
+
+                    if(S_Prefix_index++ > PARTION_COUNT){ // TODO: realloc
                         fprintf(stderr, "[ERROR] Number of %4d-suffixes overflows\n", prefix);
                         exit(0);
                     }
@@ -154,42 +139,38 @@ int main(int argc, char ** argv){
             }
         }
         
+
         for(readPos = READ_LEN - 4; readPos >= 0; readPos--){
-            uint8_t byteIndex = readPos/4;
-            uint8_t baseIndex = readPos%4;
+            uint8_t byteIndex = readPos >> 4;
+            uint8_t baseIndex = readPos % 4;
             if(!(baseIndex)) {
                 for(j = 0; j < READ_NUM; j++){
-                    if(s[j * READ_CODE_LEN + byteIndex] == prefix) {
-                        GetFragment(S_Prefix + (READ_CODE_LEN)*S_Prefix_index, s + j * READ_CODE_LEN, readPos);
-                        S_Prefix[READ_CODE_LEN*S_Prefix_index] = (readPos == 0 ? 4 : s[j * READ_CODE_LEN + byteIndex - 1] & 0x03);
-                        S_Prefix_index++;
-                        if(S_Prefix_index > PARTION_COUNT){
+                    if(readsPack[j * READ_CODE_LEN + byteIndex] == prefix) {
+                        GetFragment(S_Prefix + (READ_CODE_LEN)*S_Prefix_index, readsPack + j * READ_CODE_LEN, readPos);
+                        
+                        S_Prefix[READ_CODE_LEN*S_Prefix_index] = (readPos == 0 ? 4 : readsPack[j * READ_CODE_LEN + byteIndex - 1] & 0x03);
+                        
+                        if(S_Prefix_index++ > PARTION_COUNT){
                             fprintf(stderr, "[ERROR] Number of %4d-suffixes overflow\n", prefix);
                         }
                     }
                 } 
             } else {
                 for(j = 0; j < READ_NUM; j++){
-                    if((uint8_t)(s[j * READ_CODE_LEN + byteIndex] << (baseIndex * 2)) + (uint8_t)(s[j * READ_CODE_LEN + \
+                    if((uint8_t)(readsPack[j * READ_CODE_LEN + byteIndex] << (baseIndex * 2)) + (uint8_t)(readsPack[j * READ_CODE_LEN + \
                                                                         byteIndex + 1] >> (8 - baseIndex * 2)) == prefix){
-                        GetFragment(S_Prefix + (READ_CODE_LEN)*S_Prefix_index, s + j * READ_CODE_LEN, readPos);
+                        GetFragment(S_Prefix + (READ_CODE_LEN)*S_Prefix_index, readsPack + j * READ_CODE_LEN, readPos);
+
+                        S_Prefix[READ_CODE_LEN*S_Prefix_index] = ((uint8_t)readsPack[j * READ_CODE_LEN + byteIndex] >> (8 - baseIndex * 2)) & 0X03 ;
                         
-                        uint8_t sw = baseIndex - 1;
-                        switch (sw){
-                            case 0 : S_Prefix[READ_CODE_LEN*S_Prefix_index] = ((uint8_t)(s[j * READ_CODE_LEN + byteIndex] & 0xC0) >> 6); break;
-                            case 1 : S_Prefix[READ_CODE_LEN*S_Prefix_index] = ((uint8_t)(s[j * READ_CODE_LEN + byteIndex] & 0x30) >> 4); break;
-                            case 2 : S_Prefix[READ_CODE_LEN*S_Prefix_index] = ((uint8_t)(s[j * READ_CODE_LEN + byteIndex] & 0x0C) >> 2); break;
-                        }
-                        
-                        S_Prefix_index++;
-                        if(S_Prefix_index > PARTION_COUNT){
+                        if(S_Prefix_index++ > PARTION_COUNT){
                             fprintf(stderr, "[ERROR] Number of %4d-suffixes overflow\n", prefix);
                         }                        
                     }
                 }
             }  
         }
-
+        
 
         timestamp = getElapsedTime(startTime);
 
@@ -241,53 +222,58 @@ int main(int argc, char ** argv){
         }
         
         fwrite(bwt,sizeof(uint8_t), S_Prefix_index, fout);
-
+        free(bwt);
         free(aa);
         free(S_Prefix);
 
     }
+    fclose(fout);
     fprintf(stderr, "(Elapsed time (Suffixe Partition) : %9.4f seconds)\n\n", partitionTime);
     fprintf(stderr, "(Elapsed time (Suffixes Sorting ) : %9.4f seconds)\n\n", sortTime);
 
     ///////////////////////////////////////////////////////////////////
     //  Free memory allocated
     ///////////////////////////////////////////////////////////////////
-    free(s);
+    free(readsPack);
     return 0;
 }
 
 //Convert 4 bases to an uint8_t
-uint8_t Convert4BaseToOneUint8(char s1, char s2, char s3, char s4){
-    uint8_t i1 = (s1 == 'A' ? 0 : (s1 == 'C' ? 1 : (s1 == 'G'? 2 : 3)));
-    uint8_t i2 = (s2 == 'A' ? 0 : (s2 == 'C' ? 1 : (s2 == 'G'? 2 : 3)));
-    uint8_t i3 = (s3 == 'A' ? 0 : (s3 == 'C' ? 1 : (s3 == 'G'? 2 : 3)));
-    uint8_t i4 = (s4 == 'A' ? 0 : (s4 == 'C' ? 1 : (s4 == 'G'? 2 : 3)));
+uint8_t Convert4BaseToOneUint8(char * readsPack, int pos){
+    if(pos+3 > strlen(readsPack)){
+        fprintf(stderr, "%s\n", "Convert4BaseToOneUint8 Error");
+        exit(0);
+    }
+    uint8_t i1 = (readsPack[pos]   == 'A' ? 0 : (readsPack[pos]   == 'C' ? 1 : (readsPack[pos]   == 'G'? 2 : 3)));
+    uint8_t i2 = (readsPack[pos+1] == 'A' ? 0 : (readsPack[pos+1] == 'C' ? 1 : (readsPack[pos+1] == 'G'? 2 : 3)));
+    uint8_t i3 = (readsPack[pos+2] == 'A' ? 0 : (readsPack[pos+2] == 'C' ? 1 : (readsPack[pos+2] == 'G'? 2 : 3)));
+    uint8_t i4 = (readsPack[pos+3] == 'A' ? 0 : (readsPack[pos+3] == 'C' ? 1 : (readsPack[pos+3] == 'G'? 2 : 3)));
     return i1 * 64 + i2 * 16 + i3 * 4 + i4;
 }
 
 inline void GetFragment(uint8_t* destination, uint8_t * source, uint8_t starPosition){
     uint8_t i,j;
     if(starPosition%4 == 0){
-        for(i = 0, j = starPosition/4; j < READ_CODE_LEN; i++,j++){
+        for(i = 0, j = starPosition >> 2; j < READ_CODE_LEN; i++,j++){
            destination[i] = source[j];
         }
         //strncpy(destination, source + starPosition/4, READ_CODE_LEN - starPosition/4);
     } 
     else {
-        for(i = 0, j = starPosition/4; j < READ_CODE_LEN - 1; i++,j++){
+        for(i = 0, j = starPosition >> 2; j < READ_CODE_LEN - 1; i++,j++){
             destination[i] = (uint8_t)(source[j]<<(starPosition%4 * 2)) + (uint8_t)(source[j+1] >>(8 - starPosition%4 * 2));
         }
         destination[i] = (uint8_t)(source[READ_CODE_LEN-1] << (starPosition%4 * 2));
     }
 }
 
-void rsort(string * a, int n){ //Sort n strings
+void rsort(string * a, unsigned long long n){ //Sort n strings
 
     List *stack = (List*)malloc(sizeof(List) * READ_NUM);
     List *sp = stack; 
     string          *pile[256], *ai, *ak, *ta;
-    static int      count[256] = {0};
-    int             b = 1, c, cmin, *cp, nc = 0; // nc: number of unempty buckets
+    static unsigned int      count[256] = {0};
+    unsigned int             b = 1, c, cmin, *cp, nc = 0; // nc: number of unempty buckets
 
 #define push(a, n, i)   sp->sa = a, sp->sn = n, (sp++)->si = i
 #define pop(a, n, i)    a = (--sp)->sa, n = sp->sn, i = sp->si
@@ -334,7 +320,7 @@ void rsort(string * a, int n){ //Sort n strings
     free(ta);
 }
 
-void SelectionSort(string *a, int n, int b) {
+void SelectionSort(string *a, unsigned long long n, int b) {
     string ak;
     int base = b;
     int i, j, m;

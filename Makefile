@@ -1,7 +1,9 @@
-CC = gcc
+CC = clang
+
+CFLAGS=	-O3
 
 setBWT: 
-	$(CC) -O3 -o setBWT parallel.0.0.c Timing.c
+	$(CC) $(CFLAGS) -o setBWT setBWT.c Timing.c
  
 .PHONY: clean
 clean:
