@@ -24,22 +24,24 @@ double startTime, lastEventTime, timestamp, partitionTime = 0, sortTime = 0;
 int READ_LEN;
 unsigned long long READ_NUM;
 int READ_CODE_LEN;
-unsinged long long PARTION_COUNT;
+unsigned long long PARTION_COUNT;
+int threadsNum;
 
 
 
-void rsort(string *, unsigned long long);
+void rsort(string *, string *, unsigned long long);
 void SelectionSort(string *a, unsigned long long n, int b);
 uint8_t Convert4BaseToOneUint8(char*, int);
-void  GetFragment(uint8_t * destination, uint8_t * source, uint8_t starPosition);
+void  GetFragment(string destination, uint8_t * source, uint8_t starPosition);
 
 int main(int argc, char ** argv){
 
 
     READ_LEN = atoi(argv[2]);
     READ_NUM = atoi(argv[3]);
+    threadsNum = atoi(argv[4]);
     READ_CODE_LEN = READ_LEN/4;
-    PARTION_COUNT = READ_LEN * READ_NUM / 256 * 16; //READ_LEN * READ_NUM should be larger than 256
+    PARTION_COUNT = READ_LEN * READ_NUM / 256 * 8; //READ_LEN * READ_NUM should be larger than 256
 
 
     unsigned long long i = 0, j;
@@ -49,6 +51,7 @@ int main(int argc, char ** argv){
         printf("Fail to alloc memory for sequences. Exiting ... \n");
         exit(1);
     }
+    fprintf(stderr, "\n%s %9.4f MB\n", "[Memory] Memory Allocation:", READ_CODE_LEN * READ_NUM/1048576.0);
 
     ///////////////////////////////////////////////////////////////////
     //  Read seuquence and convert ACGT to 0123 respetively. 
@@ -99,16 +102,30 @@ int main(int argc, char ** argv){
     //  List star position of suffixes with particular 4-prefix
     ///////////////////////////////////////////////////////////////////
     int prefix;
-    //#pragma omp parallel for 
+    string * S_Prefix = 0;
+    string * ta = 0;
+    uint8_t * prefixMemory = 0;
+    #pragma omp parallel for num_threads(threadsNum) private(prefix, S_Prefix, prefixMemory, ta, i, j) shared(readsPack) schedule(dynamic)
     for(prefix = 0; prefix < 256; prefix++){ // For every possible 4-prefix
+        //fprintf(stderr, "Prefix %4d on thread %d\n", prefix, omp_get_thread_num());
 
-        uint8_t * S_Prefix = (uint8_t*)malloc(sizeof(uint8_t)*(READ_CODE_LEN)*PARTION_COUNT);
+        //uint8_t * S_Prefix = (uint8_t*)malloc(sizeof(uint8_t)*(READ_CODE_LEN)*PARTION_COUNT);
+        S_Prefix = malloc(sizeof(*S_Prefix)*PARTION_COUNT);
         if(S_Prefix == NULL) {
             fprintf(stderr, "%s\n", "Fail to alloc memory: S_Prefix");
             exit(0);
         }
+        prefixMemory = malloc(sizeof(*prefixMemory)*READ_CODE_LEN*PARTION_COUNT);
+        for(i = 0; i < PARTION_COUNT; i++){
+            S_Prefix[i] = prefixMemory + i * READ_CODE_LEN;
+            if(S_Prefix[i] == NULL){
+                fprintf(stderr, "Fail to alloc memory: S_Prefix[%llu]\n", i);
+            }
+            memset(S_Prefix[i], 0, READ_CODE_LEN);
+        }
+        //fprintf(stderr, "Memory allocated %9.4f on thread %d\n", (sizeof(*S_Prefix)*PARTION_COUNT + sizeof(uint8_t)*READ_CODE_LEN*PARTION_COUNT)/1048576.0, omp_get_thread_num());
     
-        memset(S_Prefix, 0, READ_CODE_LEN*PARTION_COUNT);
+        //memset(S_Prefix, 0, READ_CODE_LEN*PARTION_COUNT);
     
 
         unsigned long long S_Prefix_index = 0;
@@ -128,7 +145,9 @@ int main(int argc, char ** argv){
                 uint8_t value = (uint8_t)(readsPack[j*READ_CODE_LEN + READ_CODE_LEN-1] << (readPos%4 * 2));
                 if(value == prefix){
                     //S_Prefix[READ_CODE_LEN*S_Prefix_index] = value;
-                    S_Prefix[READ_CODE_LEN*S_Prefix_index] = ((uint8_t)readsPack[j * READ_CODE_LEN + READ_CODE_LEN-1] >> (8 - readPos%4 * 2)) & 0X03 ;
+                    //S_Prefix[READ_CODE_LEN*S_Prefix_index] = ((uint8_t)readsPack[j * READ_CODE_LEN + READ_CODE_LEN-1] >> (8 - readPos%4 * 2)) & 0X03 ;
+                    uint8_t tmp = (uint8_t)(((uint8_t)readsPack[j * READ_CODE_LEN + READ_CODE_LEN-1] >> (8 - readPos%4 * 2)) & 0X03);
+                    *(S_Prefix + S_Prefix_index) = &tmp; //((uint8_t)readsPack[j * READ_CODE_LEN + READ_CODE_LEN-1] >> (8 - readPos%4 * 2)) & 0X03 ;
 
                     if(S_Prefix_index++ > PARTION_COUNT){ // TODO: realloc
                         fprintf(stderr, "[ERROR] Number of %4d-suffixes overflows\n", prefix);
@@ -141,14 +160,16 @@ int main(int argc, char ** argv){
         
 
         for(readPos = READ_LEN - 4; readPos >= 0; readPos--){
-            uint8_t byteIndex = readPos >> 4;
+            uint8_t byteIndex = (uint8_t)(readPos/4);
             uint8_t baseIndex = readPos % 4;
             if(!(baseIndex)) {
                 for(j = 0; j < READ_NUM; j++){
                     if(readsPack[j * READ_CODE_LEN + byteIndex] == prefix) {
-                        GetFragment(S_Prefix + (READ_CODE_LEN)*S_Prefix_index, readsPack + j * READ_CODE_LEN, readPos);
+                        GetFragment(S_Prefix[S_Prefix_index], readsPack + j * READ_CODE_LEN, readPos);
                         
-                        S_Prefix[READ_CODE_LEN*S_Prefix_index] = (readPos == 0 ? 4 : readsPack[j * READ_CODE_LEN + byteIndex - 1] & 0x03);
+                        //S_Prefix[READ_CODE_LEN*S_Prefix_index] = (readPos == 0 ? 4 : readsPack[j * READ_CODE_LEN + byteIndex - 1] & 0x03);
+                        uint8_t tmp = (readPos == 0 ? 4 : readsPack[j * READ_CODE_LEN + byteIndex - 1] & 0x03);
+                        *(S_Prefix + S_Prefix_index) = &tmp;//(readPos == 0 ? 4 : readsPack[j * READ_CODE_LEN + byteIndex - 1] & 0x03);
                         
                         if(S_Prefix_index++ > PARTION_COUNT){
                             fprintf(stderr, "[ERROR] Number of %4d-suffixes overflow\n", prefix);
@@ -159,9 +180,11 @@ int main(int argc, char ** argv){
                 for(j = 0; j < READ_NUM; j++){
                     if((uint8_t)(readsPack[j * READ_CODE_LEN + byteIndex] << (baseIndex * 2)) + (uint8_t)(readsPack[j * READ_CODE_LEN + \
                                                                         byteIndex + 1] >> (8 - baseIndex * 2)) == prefix){
-                        GetFragment(S_Prefix + (READ_CODE_LEN)*S_Prefix_index, readsPack + j * READ_CODE_LEN, readPos);
+                        //GetFragment(S_Prefix + (READ_CODE_LEN)*S_Prefix_index, readsPack + j * READ_CODE_LEN, readPos);
+                        GetFragment(S_Prefix[S_Prefix_index], readsPack + j * READ_CODE_LEN, readPos);
 
-                        S_Prefix[READ_CODE_LEN*S_Prefix_index] = ((uint8_t)readsPack[j * READ_CODE_LEN + byteIndex] >> (8 - baseIndex * 2)) & 0X03 ;
+                        uint8_t tmp = ((uint8_t)readsPack[j * READ_CODE_LEN + byteIndex] >> (8 - baseIndex * 2)) & 0X03 ;
+                        *(S_Prefix + S_Prefix_index) = &tmp; //((uint8_t)readsPack[j * READ_CODE_LEN + byteIndex] >> (8 - baseIndex * 2)) & 0X03 ;
                         
                         if(S_Prefix_index++ > PARTION_COUNT){
                             fprintf(stderr, "[ERROR] Number of %4d-suffixes overflow\n", prefix);
@@ -188,15 +211,17 @@ int main(int argc, char ** argv){
             if(i%(READ_CODE_LEN) == READ_CODE_LEN-1) putchar('\n');
         }
         */
+        /*
         string * aa = (string*)malloc(sizeof(string)*S_Prefix_index);
         for(i = 0; i < S_Prefix_index; i++)
             aa[i] = S_Prefix + READ_CODE_LEN * i;
-
+        */
         
         lastEventTime = getElapsedTime(startTime);
 
-        rsort(aa, S_Prefix_index);
-
+        ta = malloc(S_Prefix_index*sizeof(*ta)); // Total size: 4n
+        rsort(S_Prefix, ta, S_Prefix_index);
+        free(ta); ta = NULL;
         timestamp = getElapsedTime(startTime);
 
         sortTime += timestamp - lastEventTime;
@@ -216,6 +241,7 @@ int main(int argc, char ** argv){
         ///////////////////////////////////////////////////////////////////
         //  Print BWT
         ///////////////////////////////////////////////////////////////////
+        /*
         uint8_t * bwt = (uint8_t*)malloc(sizeof(uint8_t)*S_Prefix_index);
         for(i = 0; i < S_Prefix_index; i++){
             bwt[i] = *(aa+i)[0];
@@ -223,9 +249,10 @@ int main(int argc, char ** argv){
         
         fwrite(bwt,sizeof(uint8_t), S_Prefix_index, fout);
         free(bwt);
-        free(aa);
-        free(S_Prefix);
-
+        */
+        free(S_Prefix); S_Prefix = NULL;
+        free(prefixMemory); prefixMemory = NULL;
+        fprintf(stderr, "Prefix %4d Done on thread %d\n", prefix, omp_get_thread_num());
     }
     fclose(fout);
     fprintf(stderr, "(Elapsed time (Suffixe Partition) : %9.4f seconds)\n\n", partitionTime);
@@ -251,7 +278,7 @@ uint8_t Convert4BaseToOneUint8(char * readsPack, int pos){
     return i1 * 64 + i2 * 16 + i3 * 4 + i4;
 }
 
-inline void GetFragment(uint8_t* destination, uint8_t * source, uint8_t starPosition){
+inline void GetFragment(string destination, uint8_t * source, uint8_t starPosition){
     uint8_t i,j;
     if(starPosition%4 == 0){
         for(i = 0, j = starPosition >> 2; j < READ_CODE_LEN; i++,j++){
@@ -267,25 +294,31 @@ inline void GetFragment(uint8_t* destination, uint8_t * source, uint8_t starPosi
     }
 }
 
-void rsort(string * a, unsigned long long n){ //Sort n strings
+void rsort(string * a, string * ta, unsigned long long n){ //Sort n strings
 
-    List *stack = (List*)malloc(sizeof(List) * READ_NUM);
-    List *sp = stack; 
-    string          *pile[256], *ai, *ak, *ta;
+    List stack[1048576];// It's somewhat dangerous. To be fixed.
+    List *sp = stack; //Fetch the top element of stack
+    string                   *pile[256], *ai, *ak;
     static unsigned int      count[256] = {0};
     unsigned int             b = 1, c, cmin, *cp, nc = 0; // nc: number of unempty buckets
 
 #define push(a, n, i)   sp->sa = a, sp->sn = n, (sp++)->si = i
-#define pop(a, n, i)    a = (--sp)->sa, n = sp->sn, i = sp->si
-#define stackempty()    (sp <= stack)
+#define  pop(a, n, i)   a = (--sp)->sa, n = sp->sn, i = sp->si
 
 
-    ta = malloc(n*sizeof(string)); // Total size: n
-    push(a, n, 1); // sp->sa = a, sp->sn = n, sp->si = 0, sp++; 
-    while(sp > stack) {
+
+    push(a, n, b); // sp->sa = a, sp->sn = n, sp->si = 0, sp++; 
+
+    while(sp > stack) { //stack not empty
         pop(a, n, b); // sp--, a = sp->sa, n = sp->sn, b = sp->si;
         //Ignore the bytes before b
     
+        unsigned int i = 0;
+        for(; i++ < n;){
+            if((*(a+i))[0] != (*a)[0]) break;
+        }
+        if(i == n) continue;
+
         //When the total num is less thah THRESHOLD, sort them by means of comparison.
         if(n < THRESHOLD) {
             SelectionSort(a, n, b);
@@ -295,19 +328,21 @@ void rsort(string * a, unsigned long long n){ //Sort n strings
         cmin = 255; //Minimum value in the bytes
         for(ak = a+n; --ak >= a; ) {
             c = (*ak)[b]; //Fetch the b-th byte of ak-th string
-            if(++count[c] == 1 && c > 0) { // count[c]++; then check if c is a new value
+            if(++count[c] == 1 && c > 0) { // count[c]++; then check if c is a new value. //Whatif c == 0 ?
                 if(c < cmin) cmin = c; //Record the minimum value
                 nc++; //New bucket
             }
         }
 
-        pile[0] = ak = a + count[0];         
+        ak = a + count[0];         
+        pile[0]  = ak;         
         count[0] = 0;
         for(cp = count+cmin; nc > 0; cp++, nc--) {
             while(*cp == 0) cp++; //find next cp s.t. cp != 0;
             if(*cp > 1)
-                push(ak, *cp, b+1); // Sort ak by the (b+1)-th byte, with total num cp
-            pile[cp - count] = ak += *cp;
+                push(ak, *cp, b+1); // Sort ak by the (b+1)-th byte, with total num *cp
+            ak += *cp;
+            pile[cp - count] = ak;
             *cp = 0;
         }
 
@@ -315,9 +350,9 @@ void rsort(string * a, unsigned long long n){ //Sort n strings
             *--ak = *--ai;
         for(ak = ta+n; ak-- > ta; )
             *--pile[(*ak)[b]] = *ak;
-    } 
-    free(stack);
-    free(ta);
+    }
+
+    //free(ta);
 }
 
 void SelectionSort(string *a, unsigned long long n, int b) {
