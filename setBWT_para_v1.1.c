@@ -29,8 +29,9 @@ int threadsNum;
 unsigned long long partitionCount[256] = {0}; //Number of suffixes with specific prefix
 
 
+inline void String2Pack(char * source, uint8_t * destination, unsigned int len);
 
-void rsort(string *, string *, unsigned long long);
+void rsort(string *, string *, List*, unsigned long long);
 void SelectionSort(string *a, unsigned long long n, int b);
 uint8_t Convert4BaseToOneUint8(char*, int);
 void  GetFragment(string destination, uint8_t * source, uint8_t starPosition);
@@ -40,7 +41,7 @@ int main(int argc, char ** argv){
 
     READ_LEN = atoi(argv[2]);
     READ_NUM = atoi(argv[3]);
-    //threadsNum = atoi(argv[4]);
+    threadsNum = atoi(argv[4]);
     READ_CODE_LEN = READ_LEN/4;
     //PARTION_COUNT = READ_LEN * READ_NUM / 256 * 8; //READ_LEN * READ_NUM should be larger than 256
 
@@ -75,17 +76,19 @@ int main(int argc, char ** argv){
 
 
     char readLine[MAX_LINE_LENGTH];
+    uint8_t readPack[MAX_LINE_LENGTH];
     //fgets(readLine, MAX_LINE_LENGTH, fp);
     while(fgets(readLine, MAX_LINE_LENGTH, fp)){
         if(readLine[0] == '>') continue;
-
         for(j = READ_LEN; j < READ_LEN + 4; j++) readLine[j] = 'A';
+        String2Pack(readLine, readPack, READ_LEN+4);
+        
         for(j = 0; j < READ_LEN; j++){
-            partitionCount[Convert4BaseToOneUint8(readLine, j)]++;
+            partitionCount[readPack[j]*64 + readPack[j+1]*16 + readPack[j+2]*4 + readPack[j+3]]++;
         }
 
         for(j = 0; j < READ_CODE_LEN; j++){
-            readsPack[i * READ_CODE_LEN + j] = Convert4BaseToOneUint8(readLine, j*4);                 
+            readsPack[i * READ_CODE_LEN + j] = readPack[j*4]*64 + readPack[j*4+1]*16 + readPack[j*4+2]*4 + readPack[j*4+3];                 
         }
         i++;
     }
@@ -116,11 +119,9 @@ int main(int argc, char ** argv){
     string * S_Prefix = 0;
     string * ta = 0;
     uint8_t * prefixMemory = 0;
-    //#pragma omp parallel for \
-    //            num_threads(threadsNum) \
-    //            private(prefix, S_Prefix, prefixMemory, ta, i, j) \
-    //            shared(readsPack) \
-    //            schedule(dynamic)
+    List * stack = 0;
+    #pragma omp parallel for num_threads(threadsNum) reduction(+:partitionTime, sortTime) \
+            private(prefix, S_Prefix, prefixMemory, stack, ta, i, j) shared(readsPack) schedule(dynamic)
     for(prefix = 0; prefix < 256; prefix++){ // For every possible 4-prefix
         //fprintf(stderr, "Prefix %4d on thread %d\n", prefix, omp_get_thread_num());
 
@@ -160,7 +161,7 @@ int main(int argc, char ** argv){
             for(j = 0; j < READ_NUM; j++){
                 uint8_t value = (uint8_t)(readsPack[j*READ_CODE_LEN + READ_CODE_LEN-1] << (readPos%4 * 2));
                 if(value == prefix){
-                    S_Prefix[S_Prefix_index][0] = prefix;
+                    //S_Prefix[S_Prefix_index][0] = prefix;
                     //S_Prefix[READ_CODE_LEN*S_Prefix_index] = ((uint8_t)readsPack[j * READ_CODE_LEN + READ_CODE_LEN-1] >> (8 - readPos%4 * 2)) & 0X03 ;
                     uint8_t tmp = (uint8_t)(((uint8_t)readsPack[j * READ_CODE_LEN + READ_CODE_LEN-1] >> (8 - readPos%4 * 2)) & 0X03);
                     (*(S_Prefix + S_Prefix_index))[0] = tmp; //((uint8_t)readsPack[j * READ_CODE_LEN + READ_CODE_LEN-1] >> (8 - readPos%4 * 2)) & 0X03 ;
@@ -243,31 +244,37 @@ int main(int argc, char ** argv){
         */
         
         lastEventTime = getElapsedTime(startTime);
-        
-        ta = malloc(sizeof(*ta)* S_Prefix_index); // Total size: 4n
-        if(ta == NULL){
+
+        ta = malloc(S_Prefix_index*sizeof(*ta)); // Total size: 4n
+        if(ta == NULL) {
             fprintf(stderr, "%s\n", "Fail to alloc memory: ta");
-            exit(1);
+            exit(0);
         }
-        rsort(S_Prefix, ta, S_Prefix_index);
+
+        stack = malloc(sizeof(*stack)*READ_NUM);
+        if(stack == NULL) {
+            fprintf(stderr, "%s\n", "Fail to alloc memory: stack");
+            exit(0);
+        }
+
+        rsort(S_Prefix, ta, stack, S_Prefix_index);
+        free(stack); stack = NULL;
         free(ta); ta = NULL;
-        
         timestamp = getElapsedTime(startTime);
-    
-        sortTime += timestamp - lastEventTime;
-       
+
+        sortTime += timestamp - lastEventTime;       
         
         ///////////////////////////////////////////////////////////////////
         //  Print sorted suffixes
         ///////////////////////////////////////////////////////////////////
-        /*
+        
         printf("Sorted suffixes with prefix %d\n", prefix);
         for(i = 0; i < S_Prefix_index; i++){
             for(j = 0; j < READ_CODE_LEN; j++)
                 printf("%4X", *(*(S_Prefix + i) + j));
             printf("\n");
         }
-        */
+        
 
         ///////////////////////////////////////////////////////////////////
         //  Print BWT
@@ -294,6 +301,13 @@ int main(int argc, char ** argv){
     ///////////////////////////////////////////////////////////////////
     free(readsPack);
     return 0;
+}
+
+inline void String2Pack(char * source, uint8_t * destination, unsigned int len){
+    int i;
+    for(i = 0; i < len; i++){
+        destination[i] = ConvertBase2Pack(source[i]);
+    }
 }
 
 //Convert 4 bases to an uint8_t
@@ -324,9 +338,9 @@ inline void GetFragment(string destination, uint8_t * source, uint8_t starPositi
     }
 }
 
-void rsort(string * a, string * ta, unsigned long long n){ //Sort n strings
+void rsort(string * a, string * ta, List * stack, unsigned long long n){ //Sort n strings
     unsigned int pushTimes = 0;
-    List *stack = malloc(sizeof(*stack)*READ_NUM);// It's somewhat dangerous. To be fixed.
+    //List *stack = malloc(sizeof(*stack)*READ_NUM);// It's somewhat dangerous. To be fixed.
     List *sp = stack; //Fetch the top element of stack
     string                   *pile[256], *ai, *ak;
     static unsigned int      count[256] = {0};
@@ -394,7 +408,7 @@ void rsort(string * a, string * ta, unsigned long long n){ //Sort n strings
         for(ak = ta+n; ak-- > ta; )
             *--pile[(*ak)[b]] = *ak;
     }
-    free(stack); stack = NULL;
+    //free(stack); stack = NULL;
     //fprintf(stderr, "Push Times: %u\n", pushTimes);
 }
 

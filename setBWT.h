@@ -15,12 +15,21 @@
 //#define READ_NUM        10000
 #define PARTION_NUM     pow(ALPHABETA_SIZE, PRESORT_LEN)
 
-#define THRESHOLD   30
+#define THRESHOLD   20
 
 typedef uint8_t * string;
+
 typedef struct List{
     string * sa;
     int sn;
     int si;
 } List;
+
+typedef struct Arguments{
+	int READ_LEN;
+	unsigned long long READ_NUM;
+	int READ_CODE_LEN;
+	unsigned long long PARTION_COUNT;
+} Arguments;
+
 
